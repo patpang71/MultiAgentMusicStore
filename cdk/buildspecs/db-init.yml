@@ -1,0 +1,52 @@
+version: 0.2
+
+# This stage runs the Chinook SQL seed script exactly once.
+# An SSM Parameter (/music-store/db-initialized) acts as a persistent flag.
+# On every subsequent pipeline run the flag is found and the stage is a no-op.
+
+phases:
+  install:
+    runtime-versions:
+      python: "3.11"
+    commands:
+      - echo "Installing MySQL client..."
+      - apt-get update -y -qq && apt-get install -y default-mysql-client 2>/dev/null
+        || yum install -y mysql 2>/dev/null
+        || true
+
+  build:
+    commands:
+      - |
+        DB_INIT_FLAG=$(aws ssm get-parameter \
+          --name "$SSM_INIT_FLAG" \
+          --region "$AWS_DEFAULT_REGION" \
+          --query Parameter.Value \
+          --output text 2>/dev/null || echo "not-initialized")
+
+        if [ "$DB_INIT_FLAG" = "true" ]; then
+          echo "SSM flag is set — database already initialized. Skipping."
+        else
+          echo "SSM flag not found — running first-time database initialization."
+
+          DB_SECRET=$(aws secretsmanager get-secret-value \
+            --secret-id "$DB_SECRET_ARN" \
+            --query SecretString \
+            --output text)
+
+          DB_HOST=$(echo "$DB_SECRET" | python3 -c "import sys,json; print(json.load(sys.stdin)['host'])")
+          DB_USER=$(echo "$DB_SECRET" | python3 -c "import sys,json; print(json.load(sys.stdin)['username'])")
+          DB_PASS=$(echo "$DB_SECRET" | python3 -c "import sys,json; print(json.load(sys.stdin)['password'])")
+
+          echo "Running Chinook_MySql_AutoIncrementPKs.sql against $DB_HOST ..."
+          mysql -h "$DB_HOST" -u "$DB_USER" -p"$DB_PASS" \
+            < dbscripts/Chinook_MySql_AutoIncrementPKs.sql
+
+          echo "SQL script completed. Setting SSM initialization flag..."
+          aws ssm put-parameter \
+            --name "$SSM_INIT_FLAG" \
+            --value "true" \
+            --type "String" \
+            --region "$AWS_DEFAULT_REGION"
+
+          echo "Database initialized successfully. Flag stored at $SSM_INIT_FLAG."
+        fi

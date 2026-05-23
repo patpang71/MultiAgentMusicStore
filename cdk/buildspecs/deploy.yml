@@ -1,0 +1,34 @@
+version: 0.2
+
+# Builds and deploys Lambda functions using AWS SAM.
+# Requires a template.yaml (SAM template) at the repo root.
+
+phases:
+  install:
+    runtime-versions:
+      python: "3.11"
+    commands:
+      - pip install aws-sam-cli --quiet
+
+  build:
+    commands:
+      - echo "Building SAM application..."
+      - sam build
+
+  post_build:
+    commands:
+      - echo "Deploying Lambda functions to AWS..."
+      - |
+        sam deploy \
+          --stack-name "$SAM_STACK_NAME" \
+          --s3-bucket "$SAM_DEPLOY_BUCKET" \
+          --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+          --no-confirm-changeset \
+          --no-fail-on-empty-changeset \
+          --region "$AWS_DEFAULT_REGION"
+      - echo "Deploy complete."
+
+artifacts:
+  files:
+    - "**/*"
+  base-directory: ".aws-sam/build"

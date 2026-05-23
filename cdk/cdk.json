@@ -1,0 +1,28 @@
+{
+  "app": "npx ts-node --prefer-ts-exts bin/music-store-app.ts",
+  "watch": {
+    "include": ["**"],
+    "exclude": [
+      "README.md",
+      "cdk*.json",
+      "**/*.d.ts",
+      "**/*.js",
+      "tsconfig.json",
+      "package*.json",
+      "node_modules",
+      "dist"
+    ]
+  },
+  "context": {
+    "@aws-cdk/aws-lambda:recognizeLayerVersion": true,
+    "@aws-cdk/core:checkSecretUsage": true,
+    "@aws-cdk/core:target-partitions": ["aws", "aws-cn"],
+    "@aws-cdk/aws-ec2:uniqueImdsv2TemplateName": true,
+    "@aws-cdk/core:validateSnapshotRemovalPolicy": true,
+    "@aws-cdk/aws-rds:lowercaseDbIdentifier": true,
+    "githubOwner": "patpang71",
+    "githubRepo": "MultiAgentMusicStore",
+    "githubBranch": "main",
+    "codeStarConnectionArn": "arn:aws:codeconnections:us-east-1:698719916932:connection/46edca04-ec14-4a11-9a7d-199109d31d6f"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "music-store-cdk",
+  "version": "0.1.0",
+  "bin": {
+    "music-store-cdk": "bin/music-store-app.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "cdk": "cdk",
+    "synth": "cdk synth",
+    "deploy": "cdk deploy",
+    "diff": "cdk diff"
+  },
+  "devDependencies": {
+    "@types/node": "20.x",
+    "aws-cdk": "2.x",
+    "ts-node": "^10.9.2",
+    "typescript": "~5.5.0"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "2.x",
+    "constructs": "^10.0.0",
+    "source-map-support": "^0.5.21"
+  }
+}

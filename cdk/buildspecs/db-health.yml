@@ -1,0 +1,37 @@
+version: 0.2
+
+# Runs after DB_Init to verify all Chinook tables exist and contain rows.
+# Fails the pipeline if any table is missing or the seed produced zero rows.
+
+phases:
+  install:
+    runtime-versions:
+      python: "3.11"
+    commands:
+      - pip install pytest sqlalchemy pymysql python-dotenv --quiet
+
+  build:
+    commands:
+      - echo "Running database health check..."
+      - |
+        export DB_HOST=$(aws secretsmanager get-secret-value \
+          --secret-id "$DB_SECRET_ARN" \
+          --query SecretString \
+          --output text | python3 -c "import sys,json; print(json.load(sys.stdin)['host'])")
+        export DB_USER=$(aws secretsmanager get-secret-value \
+          --secret-id "$DB_SECRET_ARN" \
+          --query SecretString \
+          --output text | python3 -c "import sys,json; print(json.load(sys.stdin)['username'])")
+        export DB_PASSWORD=$(aws secretsmanager get-secret-value \
+          --secret-id "$DB_SECRET_ARN" \
+          --query SecretString \
+          --output text | python3 -c "import sys,json; print(json.load(sys.stdin)['password'])")
+        export DB_NAME="Chinook_AutoIncrement"
+
+        pytest dbscripts/tests/test_db_health.py -v --tb=short
+
+reports:
+  health_check_results:
+    files:
+      - "test-reports/**/*"
+    file-format: JUNITXML
