@@ -1,34 +1,24 @@
 version: 0.2
 
-# Builds and deploys Lambda functions using AWS SAM.
-# Requires a template.yaml (SAM template) at the repo root.
+# Deploys the full stack (including music-store-tools Lambda) via CDK.
+# pip pre-installs Lambda dependencies into the source directory so CDK
+# bundles them into the asset zip without needing Docker.
 
 phases:
   install:
     runtime-versions:
+      nodejs: "18"
       python: "3.11"
     commands:
-      - pip install aws-sam-cli --quiet
+      - cd cdk && npm ci --quiet && cd ..
+      - pip install -r lambdas/music_store_tools/requirements.txt -t lambdas/music_store_tools/ --quiet
 
   build:
     commands:
-      - echo "Building SAM application..."
-      - sam build
-
-  post_build:
-    commands:
-      - echo "Deploying Lambda functions to AWS..."
-      - |
-        sam deploy \
-          --stack-name "$SAM_STACK_NAME" \
-          --s3-bucket "$SAM_DEPLOY_BUCKET" \
-          --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
-          --no-confirm-changeset \
-          --no-fail-on-empty-changeset \
-          --region "$AWS_DEFAULT_REGION"
+      - echo "Deploying infrastructure and Lambda via CDK..."
+      - cd cdk && npx cdk deploy MusicStoreStack --require-approval never --outputs-file ../cdk-outputs.json
       - echo "Deploy complete."
 
 artifacts:
   files:
-    - "**/*"
-  base-directory: ".aws-sam/build"
+    - cdk-outputs.json

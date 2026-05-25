@@ -149,6 +149,25 @@ export class MusicStorePipeline extends Construct {
       })
     );
 
+    // CDK deploy reads the bootstrap version from SSM and assumes CDK toolkit roles
+    deployProject.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['ssm:GetParameter'],
+        resources: [
+          `arn:aws:ssm:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:parameter/cdk-bootstrap/*`,
+        ],
+      })
+    );
+
+    deployProject.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['sts:AssumeRole'],
+        resources: [
+          `arn:aws:iam::${cdk.Stack.of(this).account}:role/cdk-*`,
+        ],
+      })
+    );
+
     // --- Pipeline ---
     const pipeline = new codepipeline.Pipeline(this, 'MusicStorePipeline', {
       pipelineName: 'music-store-pipeline',

@@ -3,6 +3,7 @@ import { Construct } from 'constructs';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import { Database } from './constructs/database';
 import { MusicStorePipeline } from './constructs/pipeline';
+import { MusicStoreToolsLambda } from './constructs/music-store-tools-lambda';
 
 export interface MusicStoreStackProps extends cdk.StackProps {
   githubOwner: string;
@@ -33,6 +34,8 @@ export class MusicStoreStack extends cdk.Stack {
     });
 
     const database = new Database(this, 'Database', { vpc });
+
+    new MusicStoreToolsLambda(this, 'MusicStoreToolsLambda', { vpc, database });
 
     new MusicStorePipeline(this, 'Pipeline', {
       vpc,
