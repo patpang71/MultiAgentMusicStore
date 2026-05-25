@@ -119,10 +119,6 @@ export class MusicStorePipeline extends Construct {
       ),
       environment: {
         buildImage: codebuild.LinuxBuildImage.STANDARD_7_0,
-        environmentVariables: {
-          SAM_STACK_NAME: { value: 'music-store-app' },
-          SAM_DEPLOY_BUCKET: { value: `music-store-sam-${cdk.Stack.of(this).account}` },
-        },
       },
     });
 
