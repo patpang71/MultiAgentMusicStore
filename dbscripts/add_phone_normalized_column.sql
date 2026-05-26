@@ -10,8 +10,14 @@
 
 USE Chinook_AutoIncrement;
 
+/*
 ALTER TABLE Customer
     ADD COLUMN IF NOT EXISTS PhoneNormalized VARCHAR(40) DEFAULT NULL;
+*/
+
+ALTER TABLE Customer
+    ADD COLUMN PhoneNormalized VARCHAR(40) DEFAULT NULL;
+
 
 UPDATE Customer
 SET PhoneNormalized = REPLACE(
@@ -23,5 +29,10 @@ SET PhoneNormalized = REPLACE(
                       '-', '')
 WHERE Phone IS NOT NULL;
 
+/*
 CREATE INDEX IF NOT EXISTS idx_customer_phone_normalized
+    ON Customer (PhoneNormalized);
+    */
+
+CREATE INDEX idx_customer_phone_normalized
     ON Customer (PhoneNormalized);
