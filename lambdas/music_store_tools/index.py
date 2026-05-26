@@ -6,6 +6,9 @@ from get_track_details_by_id import get_track_details_by_id
 from get_invoices_by_customer_sorted_by_date import get_invoices_by_customer_sorted_by_date
 from get_purchased_tracks_sorted_by_unit_price import get_purchased_tracks_sorted_by_unit_price
 from get_detail_line_item_for_invoice import get_detail_line_item_for_invoice
+from get_customer_by_id import get_customer_by_id
+from get_customer_by_email import get_customer_by_email
+from get_customer_by_phone import get_customer_by_phone
 
 TOOL_NAMES = {
     "get_albums_by_artist",
@@ -16,6 +19,9 @@ TOOL_NAMES = {
     "get_invoices_by_customer_sorted_by_date",
     "get_purchased_tracks_sorted_by_unit_price",
     "get_detail_line_item_for_invoice",
+    "get_customer_by_id",
+    "get_customer_by_email",
+    "get_customer_by_phone",
 }
 
 # Tools that require no input value
@@ -43,8 +49,11 @@ def handler(event, context):
         "get_songs_by_genre":                       get_songs_by_genre,
         "search_songs_by_title":                    search_songs_by_title,
         "get_track_details_by_id":                  get_track_details_by_id,
-        "get_invoices_by_customer_sorted_by_date":  get_invoices_by_customer_sorted_by_date,
+        "get_invoices_by_customer_sorted_by_date":   get_invoices_by_customer_sorted_by_date,
         "get_purchased_tracks_sorted_by_unit_price": get_purchased_tracks_sorted_by_unit_price,
         "get_detail_line_item_for_invoice":          get_detail_line_item_for_invoice,
+        "get_customer_by_id":                        get_customer_by_id,
+        "get_customer_by_email":                     get_customer_by_email,
+        "get_customer_by_phone":                     get_customer_by_phone,
     }
     return tools[tool_name](input_value)
