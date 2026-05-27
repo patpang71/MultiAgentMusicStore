@@ -33,13 +33,13 @@ export class MusicStoreToolsLambda extends Construct {
         path.join(__dirname, '../../../layers/music_store_tools_deps'),
         { exclude: ['*.pyc', '__pycache__'] }
       ),
-      compatibleRuntimes: [lambda.Runtime.PYTHON_3_11],
+      compatibleRuntimes: [lambda.Runtime.PYTHON_3_12],
       description: 'PyMySQL dependency layer for music-store-tools',
     });
 
     this.lambdaFunction = new lambda.Function(this, 'Function', {
       functionName: 'music-store-tools',
-      runtime: lambda.Runtime.PYTHON_3_11,
+      runtime: lambda.Runtime.PYTHON_3_12,
       handler: 'index.handler',
       code: lambda.Code.fromAsset(
         path.join(__dirname, '../../../lambdas/music_store_tools'),
