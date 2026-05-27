@@ -1,3 +1,6 @@
+from collections import defaultdict
+from itertools import zip_longest
+
 from db_connection import get_connection
 
 
@@ -16,6 +19,7 @@ def get_songs_by_genre(genre_input: str) -> dict:
                 AND tr.MediaTypeId = me.MediaTypeId
                 AND al.ArtistId = ar.ArtistId
                 AND ge.Name = %s
+                ORDER BY ar.Name, tr.Name
             """
             cursor.execute(sql, (genre_input,))
             rows = cursor.fetchall()
@@ -24,8 +28,9 @@ def get_songs_by_genre(genre_input: str) -> dict:
         if not rows:
             return {"message": "Cannot find any genre"}
 
-        tracks = [
-            {
+        by_artist = defaultdict(list)
+        for row in rows:
+            by_artist[row["artist"]].append({
                 "trackName": row["trackName"],
                 "albumTitle": row["albumTitle"],
                 "artist": row["artist"],
@@ -35,10 +40,14 @@ def get_songs_by_genre(genre_input: str) -> dict:
                 "milliseconds": str(row["milliseconds"]),
                 "bytes": str(row["bytes"]),
                 "unitPrice": str(row["unitPrice"]),
-            }
-            for row in rows
-        ]
-        return {"genre": genre_input, "tracks": tracks}
+            })
+
+        # Round-robin: one track per artist per round so no artist dominates
+        interleaved = []
+        for round_tracks in zip_longest(*by_artist.values()):
+            interleaved.extend(t for t in round_tracks if t is not None)
+
+        return {"genre": genre_input, "tracks": interleaved}
 
     except Exception as e:
         return {"message": f"Error {str(e)}"}
