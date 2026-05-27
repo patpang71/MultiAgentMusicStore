@@ -8,11 +8,12 @@ phases:
   install:
     runtime-versions:
       nodejs: "18"
-      python: "3.11"
+      python: "3.12"
     commands:
       - cd cdk && npm ci --quiet && cd ..
-      - pip install -r lambdas/music_store_tools/requirements.txt -t lambdas/music_store_tools/ --quiet
-      - pip install -r lambdas/music_store_agents/requirements.txt -t lambdas/music_store_agents/ --quiet
+      - mkdir -p layers/music_store_tools_deps/python layers/music_store_agents_deps/python
+      - pip install -r lambdas/music_store_tools/requirements.txt -t layers/music_store_tools_deps/python/ --quiet
+      - pip install -r lambdas/music_store_agents/requirements.txt -t layers/music_store_agents_deps/python/ --quiet
 
   build:
     commands:

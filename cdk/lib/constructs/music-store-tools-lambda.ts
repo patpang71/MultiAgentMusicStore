@@ -28,18 +28,24 @@ export class MusicStoreToolsLambda extends Construct {
       'Allow music-store-tools Lambda to reach RDS'
     );
 
+    const depsLayer = new lambda.LayerVersion(this, 'DepsLayer', {
+      code: lambda.Code.fromAsset(
+        path.join(__dirname, '../../../layers/music_store_tools_deps'),
+        { exclude: ['*.pyc', '__pycache__'] }
+      ),
+      compatibleRuntimes: [lambda.Runtime.PYTHON_3_11],
+      description: 'PyMySQL dependency layer for music-store-tools',
+    });
+
     this.lambdaFunction = new lambda.Function(this, 'Function', {
       functionName: 'music-store-tools',
       runtime: lambda.Runtime.PYTHON_3_11,
       handler: 'index.handler',
-      // requirements.txt deps are pre-installed into this directory by deploy.yml
-      // before CDK packages and uploads the asset zip
       code: lambda.Code.fromAsset(
         path.join(__dirname, '../../../lambdas/music_store_tools'),
-        {
-          exclude: ['tests', '.venv', '*.pyc', '__pycache__', 'requirements.txt', '.pytest_cache'],
-        }
+        { exclude: ['tests', '.venv', '*.pyc', '__pycache__', 'requirements.txt', '.pytest_cache'] }
       ),
+      layers: [depsLayer],
       vpc: props.vpc,
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       securityGroups: [lambdaSg],

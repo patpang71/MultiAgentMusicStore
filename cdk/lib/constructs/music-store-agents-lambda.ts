@@ -15,18 +15,24 @@ export class MusicStoreAgentsLambda extends Construct {
   constructor(scope: Construct, id: string, props: MusicStoreAgentsLambdaProps) {
     super(scope, id);
 
+    const depsLayer = new lambda.LayerVersion(this, 'DepsLayer', {
+      code: lambda.Code.fromAsset(
+        path.join(__dirname, '../../../layers/music_store_agents_deps'),
+        { exclude: ['*.pyc', '__pycache__'] }
+      ),
+      compatibleRuntimes: [lambda.Runtime.PYTHON_3_12],
+      description: 'LangChain/LangGraph dependency layer for music-store-agents',
+    });
+
     this.lambdaFunction = new lambda.Function(this, 'Function', {
       functionName: 'music-store-agents',
-      runtime: lambda.Runtime.PYTHON_3_11,
+      runtime: lambda.Runtime.PYTHON_3_12,
       handler: 'index.handler',
-      // requirements.txt deps are pre-installed into this directory by deploy.yml
-      // before CDK packages and uploads the asset zip
       code: lambda.Code.fromAsset(
         path.join(__dirname, '../../../lambdas/music_store_agents'),
-        {
-          exclude: ['tests', '.venv', '*.pyc', '__pycache__', 'requirements.txt', '.pytest_cache'],
-        }
+        { exclude: ['tests', '.venv', '*.pyc', '__pycache__', 'requirements.txt', '.pytest_cache'] }
       ),
+      layers: [depsLayer],
       environment: {
         DB_SECRET_ARN: props.dbSecret.secretArn,
         MUSIC_STORE_TOOLS_FUNCTION_NAME: props.musicStoreToolsFunction.functionName,
