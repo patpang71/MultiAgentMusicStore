@@ -15,7 +15,7 @@ def _deserialize_messages(raw: list) -> list:
             result.append(AIMessage(content=content))
         elif role == "system":
             result.append(SystemMessage(content=content))
-        # tool messages from previous turns are preserved as-is (already strings)
+        # tool messages from previous turns are skipped (they are regenerated each turn)
     return result
 
 
@@ -37,6 +37,8 @@ def handler(event, context):
         "messages": _deserialize_messages(event.get("messages", [])),
         "customer_info": event.get("customer_info"),
         "verified": event.get("verified", False),
+        "preferences": event.get("preferences"),   # None on first login; loaded from DynamoDB by supervisor
+        "next_agent": "",                           # Always reset at the start of each Lambda invocation
     }
 
     graph = create_graph()
@@ -46,4 +48,6 @@ def handler(event, context):
         "messages": _serialize_messages(result["messages"]),
         "customer_info": result.get("customer_info"),
         "verified": result.get("verified", False),
+        "preferences": result.get("preferences"),
+        "next_agent": result.get("next_agent", ""),
     }

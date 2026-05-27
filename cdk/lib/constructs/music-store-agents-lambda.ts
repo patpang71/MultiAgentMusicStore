@@ -1,6 +1,7 @@
 import * as path from 'path';
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 
@@ -14,6 +15,13 @@ export class MusicStoreAgentsLambda extends Construct {
 
   constructor(scope: Construct, id: string, props: MusicStoreAgentsLambdaProps) {
     super(scope, id);
+
+    const preferencesTable = new dynamodb.Table(this, 'PreferencesTable', {
+      tableName: 'music-store-customer-preferences',
+      partitionKey: { name: 'customerId', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
 
     const depsLayer = new lambda.LayerVersion(this, 'DepsLayer', {
       code: lambda.Code.fromAsset(
@@ -36,6 +44,7 @@ export class MusicStoreAgentsLambda extends Construct {
       environment: {
         DB_SECRET_ARN: props.dbSecret.secretArn,
         MUSIC_STORE_TOOLS_FUNCTION_NAME: props.musicStoreToolsFunction.functionName,
+        PREFERENCES_TABLE_NAME: preferencesTable.tableName,
       },
       timeout: cdk.Duration.seconds(60),
       memorySize: 512,
@@ -46,6 +55,9 @@ export class MusicStoreAgentsLambda extends Construct {
 
     // Allow the agent to invoke the tools Lambda
     props.musicStoreToolsFunction.grantInvoke(this.lambdaFunction);
+
+    // Allow the agent to read and write customer preferences
+    preferencesTable.grantReadWriteData(this.lambdaFunction);
 
     new cdk.CfnOutput(scope, 'MusicStoreAgentsLambdaArn', {
       value: this.lambdaFunction.functionArn,

@@ -7,3 +7,5 @@ class AgentState(TypedDict):
     messages: Annotated[list, add_messages]
     customer_info: Optional[dict]
     verified: bool
+    preferences: Optional[dict]   # {"genres": [...], "artists": [...]}
+    next_agent: str               # "", "music", "invoice", "end", "answered"
