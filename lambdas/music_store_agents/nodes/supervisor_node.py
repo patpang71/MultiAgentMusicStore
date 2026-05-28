@@ -45,7 +45,8 @@ Customer's saved music preferences:
 {preferences}
 
 Your role:
-1. Greet the customer warmly and show the menu when they have not made a specific request.
+1. Greet the customer by their first name ({first_name}) when they first arrive after verification,
+   then show the menu. For subsequent turns, use their name sparingly and naturally.
 2. Classify each request and route it:
    - Questions about songs, albums, artists, or genres → route = "music"
    - Questions about invoices, orders, purchases, or billing → route = "invoice"
@@ -81,9 +82,11 @@ def supervisor_node(state: AgentState) -> dict:
     llm = ChatOpenAI(model="gpt-4o-mini", api_key=api_key, temperature=0)
     structured_llm = llm.with_structured_output(SupervisorDecision)
 
+    first_name = customer_info.get("firstName", "")
     system = SystemMessage(content=SYSTEM_PROMPT.format(
         customer_info=json.dumps(customer_info, ensure_ascii=False),
         preferences=json.dumps(preferences),
+        first_name=first_name,
     ))
     messages = [system] + list(state["messages"])
 
