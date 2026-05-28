@@ -25,7 +25,7 @@ def _supervisor_router(state: AgentState) -> str:
         return END
 
 
-def create_graph():
+def create_graph(checkpointer=None):
     builder = StateGraph(AgentState)
 
     builder.add_node("verify_info", verify_info_node)
@@ -50,4 +50,4 @@ def create_graph():
     builder.add_edge("music_agent", "supervisor")
     builder.add_edge("invoice_agent", "supervisor")
 
-    return builder.compile()
+    return builder.compile(checkpointer=checkpointer)

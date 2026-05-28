@@ -24,7 +24,7 @@ Never ask for all three at once. Accept whichever the user chooses to give first
 
 def verify_info_node(state: AgentState) -> dict:
     api_key = get_openai_api_key()
-    llm = ChatOpenAI(model="gpt-4o-mini", api_key=api_key, temperature=0)
+    llm = ChatOpenAI(model="gpt-4o", api_key=api_key, temperature=0)
     llm_with_tools = llm.bind_tools(CUSTOMER_TOOLS)
 
     # Prepend the system prompt to the existing conversation
