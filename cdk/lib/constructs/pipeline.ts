@@ -172,12 +172,33 @@ export class MusicStorePipeline extends Construct {
       })
     );
 
+    // The deploy stage runs `cdk deploy` which updates the pipeline itself.
+    // Updating a pipeline that references a CodeStar connection requires PassConnection.
+    deployProject.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['codestar-connections:PassConnection'],
+        resources: [props.codeStarConnectionArn],
+      })
+    );
+
     // --- Pipeline ---
     const pipeline = new codepipeline.Pipeline(this, 'MusicStorePipeline', {
       pipelineName: 'music-store-pipeline',
       crossAccountKeys: false,
       pipelineType: codepipeline.PipelineType.V2,
     });
+
+    // Grant the pipeline's service role UseConnection so the Source stage
+    // can pull from GitHub at runtime. CDK should add this automatically via
+    // CodeStarConnectionsSourceAction, but we add it explicitly to be safe.
+    new iam.Policy(this, 'PipelineConnectionPolicy', {
+      statements: [
+        new iam.PolicyStatement({
+          actions: ['codestar-connections:UseConnection'],
+          resources: [props.codeStarConnectionArn],
+        }),
+      ],
+    }).attachToRole(pipeline.role);
 
     // Source: GitHub via CodeStar connection
     pipeline.addStage({
