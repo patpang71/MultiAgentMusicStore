@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import List, Optional
 
 from langchain_core.messages import AIMessage, SystemMessage
@@ -9,6 +10,8 @@ from typing_extensions import Literal
 from preferences_helper import load_preferences, save_preferences
 from secrets_helper import get_openai_api_key
 from state import AgentState
+
+logger = logging.getLogger(__name__)
 
 
 class SupervisorDecision(BaseModel):
@@ -64,6 +67,7 @@ Your role:
 
 
 def supervisor_node(state: AgentState) -> dict:
+    logger.info("supervisor_node called, next_agent=%s", state.get("next_agent"))
     # Returning from a sub-agent — just ask "What else?" and end the turn
     if state.get("next_agent") == "answered":
         return {
@@ -91,6 +95,7 @@ def supervisor_node(state: AgentState) -> dict:
     messages = [system] + list(state["messages"])
 
     decision: SupervisorDecision = structured_llm.invoke(messages)
+    logger.info("Supervisor decision: route=%s", decision.route)
 
     # Persist any newly detected preferences
     updated_prefs = {

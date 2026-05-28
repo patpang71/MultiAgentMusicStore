@@ -1,10 +1,13 @@
 import json
+import logging
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, ToolMessage
 
 from state import AgentState
 from secrets_helper import get_openai_api_key
 from tools.customer_lookup_tools import CUSTOMER_TOOLS, TOOL_MAP
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """You are a friendly customer verification agent for a music store.
 
@@ -23,6 +26,7 @@ Never ask for all three at once. Accept whichever the user chooses to give first
 
 
 def verify_info_node(state: AgentState) -> dict:
+    logger.info("verify_info_node called")
     api_key = get_openai_api_key()
     llm = ChatOpenAI(model="gpt-4o", api_key=api_key, temperature=0)
     llm_with_tools = llm.bind_tools(CUSTOMER_TOOLS)
@@ -42,6 +46,7 @@ def verify_info_node(state: AgentState) -> dict:
     if response.tool_calls:
         tool_messages = []
         for tool_call in response.tool_calls:
+            logger.info("Calling tool: %s with args: %s", tool_call["name"], tool_call["args"])
             tool_fn = TOOL_MAP.get(tool_call["name"])
             if tool_fn:
                 tool_result_str = tool_fn.invoke(tool_call["args"])
@@ -51,6 +56,7 @@ def verify_info_node(state: AgentState) -> dict:
                 if "customerId" in result_data and not verified:
                     customer_info = result_data
                     verified = True
+                    logger.info("Customer verified: customerId=%s", customer_info.get("customerId"))
 
                 tool_messages.append(
                     ToolMessage(
@@ -64,6 +70,9 @@ def verify_info_node(state: AgentState) -> dict:
         # Second LLM call with tool results so it can compose the final reply
         final_response = llm_with_tools.invoke(messages + new_messages)
         new_messages.append(final_response)
+
+    if not verified:
+        logger.warning("verify_info_node completed without verifying customer")
 
     # When verified, inject the customer profile into state as a system message
     # so downstream nodes can read it without re-querying the database
