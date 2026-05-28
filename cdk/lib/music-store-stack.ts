@@ -5,7 +5,7 @@ import { Database } from './constructs/database';
 import { MusicStorePipeline } from './constructs/pipeline';
 import { MusicStoreToolsLambda } from './constructs/music-store-tools-lambda';
 import { MusicStoreAgentsLambda } from './constructs/music-store-agents-lambda';
-import { GradioAppRunner } from './constructs/gradio-app-runner';
+import { GradioBeanstalk } from './constructs/gradio-beanstalk';
 
 export interface MusicStoreStackProps extends cdk.StackProps {
   githubOwner: string;
@@ -44,7 +44,7 @@ export class MusicStoreStack extends cdk.Stack {
       musicStoreToolsFunction: toolsLambda.lambdaFunction,
     });
 
-    new GradioAppRunner(this, 'GradioAppRunner', {
+    new GradioBeanstalk(this, 'GradioBeanstalk', {
       musicStoreToolsFunction: toolsLambda.lambdaFunction,
       dbSecret: database.secret,
       preferencesTable: agentsLambda.preferencesTable,

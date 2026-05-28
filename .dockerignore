@@ -1,0 +1,26 @@
+# CDK output — must be excluded to prevent infinite recursion during asset staging
+cdk/cdk.out
+cdk/node_modules
+
+# Python virtual environments (large, not needed in the image)
+**/.venv
+**/node_modules
+
+# Python bytecode
+**/__pycache__
+**/*.pyc
+**/*.pyo
+
+# Pre-built Lambda layers (Linux wheels, wrong platform for the image)
+layers/*/python
+
+# Test and development artifacts
+**/tests
+**/.pytest_cache
+**/*.egg-info
+
+# Version control and local config
+.git
+.env
+*.md
+notes

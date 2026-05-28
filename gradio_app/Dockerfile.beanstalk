@@ -1,0 +1,19 @@
+# Self-contained Dockerfile for Elastic Beanstalk deployment.
+# The build context is an assembled bundle directory (created by the pipeline buildspec),
+# not the project root. All agent source files are pre-copied into agents/ by the buildspec.
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# requirements.txt is a merged file (lambda deps + gradio deps) assembled by the buildspec.
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY agents/ agents/
+COPY app.py .
+
+# Elastic Beanstalk's nginx proxy reads the first EXPOSE port and forwards
+# external port 80 traffic to it. PORT env var tells Gradio which port to bind.
+EXPOSE 5000
+
+CMD ["python", "app.py"]

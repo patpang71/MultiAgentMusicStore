@@ -119,8 +119,6 @@ export class MusicStorePipeline extends Construct {
       ),
       environment: {
         buildImage: codebuild.LinuxBuildImage.STANDARD_7_0,
-        // Required for Docker builds (DockerImageAsset used by GradioAppRunner).
-        privileged: true,
       },
     });
 
@@ -166,22 +164,10 @@ export class MusicStorePipeline extends Construct {
       })
     );
 
-    // Allow the deploy project to push Docker images to ECR (needed for DockerImageAsset).
+    // Elastic Beanstalk permissions for Gradio app deployment.
     deployProject.addToRolePolicy(
       new iam.PolicyStatement({
-        actions: [
-          'ecr:GetAuthorizationToken',
-          'ecr:BatchCheckLayerAvailability',
-          'ecr:GetDownloadUrlForLayer',
-          'ecr:BatchGetImage',
-          'ecr:InitiateLayerUpload',
-          'ecr:UploadLayerPart',
-          'ecr:CompleteLayerUpload',
-          'ecr:PutImage',
-          'ecr:CreateRepository',
-          'ecr:DescribeRepositories',
-          'apprunner:*',
-        ],
+        actions: ['elasticbeanstalk:*', 'ec2:Describe*', 'autoscaling:Describe*'],
         resources: ['*'],
       })
     );

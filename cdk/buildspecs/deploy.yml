@@ -1,8 +1,8 @@
 version: 0.2
 
-# Deploys the full stack (including music-store-tools Lambda) via CDK.
-# pip pre-installs Lambda dependencies into the source directory so CDK
-# bundles them into the asset zip without needing Docker.
+# 1. Installs Lambda layer dependencies (langgraph, langchain, langchain-openai).
+# 2. Runs CDK deploy to update infrastructure (Lambdas, DynamoDB, EB application/environment).
+# 3. Assembles the Gradio source bundle and deploys it to Elastic Beanstalk.
 
 phases:
   install:
@@ -17,9 +17,44 @@ phases:
 
   build:
     commands:
-      - echo "Deploying infrastructure and Lambda via CDK..."
+      # --- CDK deploy (Lambdas + EB infrastructure) ---
+      - echo "Deploying infrastructure via CDK..."
       - cd cdk && npx cdk deploy MusicStoreStack --require-approval never --outputs-file ../cdk-outputs.json
-      - echo "Deploy complete."
+      - cd ..
+      - echo "CDK deploy complete."
+
+      # --- Gradio Elastic Beanstalk deployment ---
+      - echo "Building Gradio source bundle..."
+      - BUNDLE_BUCKET=$(python3 -c "import json; d=json.load(open('cdk-outputs.json')); print(d['MusicStoreStack']['GradioBundleBucketName'])")
+      - VERSION_LABEL="v$(date +%Y%m%d%H%M%S)"
+
+      # Assemble the self-contained bundle directory
+      - mkdir -p eb-bundle/agents/nodes eb-bundle/agents/tools
+      - cp gradio_app/app.py eb-bundle/
+      - cp gradio_app/Dockerfile.beanstalk eb-bundle/Dockerfile
+      # Merge Lambda and Gradio requirements into one file
+      - cat lambdas/music_store_agents/requirements.txt gradio_app/requirements.txt > eb-bundle/requirements.txt
+      # Copy agent source files
+      - cp lambdas/music_store_agents/graph.py lambdas/music_store_agents/state.py lambdas/music_store_agents/secrets_helper.py lambdas/music_store_agents/preferences_helper.py eb-bundle/agents/
+      - cp -r lambdas/music_store_agents/nodes/. eb-bundle/agents/nodes/
+      - cp -r lambdas/music_store_agents/tools/. eb-bundle/agents/tools/
+
+      # Zip and upload
+      - cd eb-bundle && zip -r ../gradio-bundle.zip . && cd ..
+      - aws s3 cp gradio-bundle.zip s3://$BUNDLE_BUCKET/gradio-$VERSION_LABEL.zip
+
+      # Create a new EB application version and deploy it
+      - |
+        aws elasticbeanstalk create-application-version \
+          --application-name music-store-gradio \
+          --version-label $VERSION_LABEL \
+          --source-bundle S3Bucket=$BUNDLE_BUCKET,S3Key=gradio-$VERSION_LABEL.zip
+      - |
+        aws elasticbeanstalk update-environment \
+          --application-name music-store-gradio \
+          --environment-name music-store-gradio-env \
+          --version-label $VERSION_LABEL
+      - echo "Gradio deployment initiated. Monitor progress in the EB console."
 
 artifacts:
   files:

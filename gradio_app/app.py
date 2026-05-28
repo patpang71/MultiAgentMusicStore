@@ -87,7 +87,7 @@ def new_conversation():
 # ---------------------------------------------------------------------------
 # Gradio Blocks layout
 # ---------------------------------------------------------------------------
-with gr.Blocks(title="Music Store Assistant", theme=gr.themes.Soft()) as demo:
+with gr.Blocks(title="Music Store Assistant") as demo:
     gr.Markdown("## 🎵 Music Store Assistant")
     gr.Markdown(
         "Ask me about artists, albums, and tracks — or check your purchase history.  \n"
@@ -97,7 +97,6 @@ with gr.Blocks(title="Music Store Assistant", theme=gr.themes.Soft()) as demo:
     with gr.Row():
         with gr.Column(scale=4):
             chatbot = gr.Chatbot(
-                type="messages",
                 height=520,
                 show_copy_button=True,
                 bubble_full_width=False,
@@ -144,4 +143,5 @@ if __name__ == "__main__":
         server_name="0.0.0.0",
         server_port=int(os.environ.get("PORT", "7860")),
         show_error=True,
+        theme=gr.themes.Soft(),
     )
