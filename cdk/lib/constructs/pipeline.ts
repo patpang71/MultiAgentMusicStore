@@ -167,7 +167,7 @@ export class MusicStorePipeline extends Construct {
     // Elastic Beanstalk permissions for Gradio app deployment.
     deployProject.addToRolePolicy(
       new iam.PolicyStatement({
-        actions: ['elasticbeanstalk:*', 'ec2:Describe*', 'autoscaling:Describe*'],
+        actions: ['elasticbeanstalk:*', 'ec2:Describe*', 'autoscaling:*'],
         resources: ['*'],
       })
     );
