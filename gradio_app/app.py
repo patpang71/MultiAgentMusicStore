@@ -98,8 +98,6 @@ with gr.Blocks(title="Music Store Assistant") as demo:
         with gr.Column(scale=4):
             chatbot = gr.Chatbot(
                 height=520,
-                show_copy_button=True,
-                bubble_full_width=False,
                 placeholder="Your conversation will appear here…",
             )
         with gr.Column(scale=1, min_width=180):
