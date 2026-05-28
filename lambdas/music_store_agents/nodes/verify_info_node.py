@@ -81,7 +81,7 @@ def verify_info_node(state: AgentState) -> dict:
             content=f"Verified customer profile: {json.dumps(customer_info)}"
         )
         new_messages = [customer_context] + new_messages
-
+    logger.info("verify_info_node completed, verified=%s", verified)
     return {
         "messages": new_messages,
         "customer_info": customer_info,

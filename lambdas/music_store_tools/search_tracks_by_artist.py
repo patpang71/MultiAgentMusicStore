@@ -1,7 +1,11 @@
 from db_connection import get_connection
+import logging
 
+logging.basicConfig(level=logging.INFO)
 
 def search_tracks_by_artist(artist_input: str) -> dict:
+    logger = logging.getLogger(__name__)
+    logger.info(f"Received input for search_tracks_by_artist: {artist_input}")
     try:
         conn = get_connection()
         with conn.cursor() as cursor:
@@ -39,7 +43,9 @@ def search_tracks_by_artist(artist_input: str) -> dict:
             }
             for row in rows
         ]
+        logger.info(f"Found {len(tracks)} tracks for artist '{artist_input}'")
         return {"artist": artist_input, "tracks": tracks}
 
     except Exception as e:
+        logger.error(f"Error in search_tracks_by_artist: {str(e)}")
         return {"message": f"Error {str(e)}"}

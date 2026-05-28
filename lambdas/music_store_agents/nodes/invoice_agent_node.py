@@ -1,4 +1,5 @@
 import json
+import logging
 
 from langchain_core.messages import SystemMessage, ToolMessage
 from langchain_openai import ChatOpenAI
@@ -6,6 +7,8 @@ from langchain_openai import ChatOpenAI
 from secrets_helper import get_openai_api_key
 from state import AgentState
 from tools.invoice_tools import INVOICE_TOOL_MAP, INVOICE_TOOLS
+
+logging.basicConfig(level=logging.INFO)
 
 SYSTEM_PROMPT = """You are the invoice agent for JP Music Store.
 
@@ -31,9 +34,11 @@ After answering, end with: "Is there anything else I can help you with regarding
 def invoice_agent_node(state: AgentState) -> dict:
     customer_info = state.get("customer_info") or {}
     customer_id = customer_info.get("customerId", "")
+    logger = logging.getLogger(__name__)
+    logger.info("invoice_agent_node called for customer_id=%s", customer_id)
 
     api_key = get_openai_api_key()
-    llm = ChatOpenAI(model="gpt-4o-mini", api_key=api_key, temperature=0)
+    llm = ChatOpenAI(model="gpt-4o", api_key=api_key, temperature=0)
     llm_with_tools = llm.bind_tools(INVOICE_TOOLS)
 
     system = SystemMessage(content=SYSTEM_PROMPT.format(
@@ -52,6 +57,7 @@ def invoice_agent_node(state: AgentState) -> dict:
 
         for call in response.tool_calls:
             tool_fn = INVOICE_TOOL_MAP.get(call["name"])
+            logger.info("Calling tool: %s with args: %s", call["name"], call["args"])
             result = (
                 tool_fn.invoke(call["args"])
                 if tool_fn

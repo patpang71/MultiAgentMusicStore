@@ -1,9 +1,12 @@
 import json
+import logging
 
 from langchain_core.messages import SystemMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 
 from secrets_helper import get_openai_api_key
+
+logger = logging.getLogger(__name__)
 from state import AgentState
 from tools.music_catalog_tools import MUSIC_TOOL_MAP, MUSIC_TOOLS
 
@@ -25,8 +28,10 @@ After answering, end with: "Is there anything else you'd like to know about our 
 
 
 def music_agent_node(state: AgentState) -> dict:
+    logger = logging.getLogger(__name__)
+    logger.info("music_agent_node called")
     api_key = get_openai_api_key()
-    llm = ChatOpenAI(model="gpt-4o-mini", api_key=api_key, temperature=0)
+    llm = ChatOpenAI(model="gpt-4o", api_key=api_key, temperature=0)
     llm_with_tools = llm.bind_tools(MUSIC_TOOLS)
 
     messages = [SystemMessage(content=SYSTEM_PROMPT)] + list(state["messages"])
@@ -41,6 +46,7 @@ def music_agent_node(state: AgentState) -> dict:
 
         for call in response.tool_calls:
             tool_fn = MUSIC_TOOL_MAP.get(call["name"])
+            logger.info("Calling tool: %s with args: %s", call["name"], call["args"])
             result = (
                 tool_fn.invoke(call["args"])
                 if tool_fn
@@ -48,6 +54,7 @@ def music_agent_node(state: AgentState) -> dict:
             )
             new_messages.append(ToolMessage(content=result, tool_call_id=call["id"]))
 
+    logger.info("music_agent_node completed")
     return {
         "messages": new_messages,
         "next_agent": "answered",

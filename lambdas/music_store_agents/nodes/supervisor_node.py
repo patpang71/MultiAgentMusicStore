@@ -83,7 +83,7 @@ def supervisor_node(state: AgentState) -> dict:
         preferences = load_preferences(customer_id)
 
     api_key = get_openai_api_key()
-    llm = ChatOpenAI(model="gpt-4o-mini", api_key=api_key, temperature=0)
+    llm = ChatOpenAI(model="gpt-4o", api_key=api_key, temperature=0)
     structured_llm = llm.with_structured_output(SupervisorDecision)
 
     first_name = customer_info.get("firstName", "")
