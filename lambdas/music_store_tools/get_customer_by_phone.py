@@ -26,7 +26,9 @@ def get_customer_by_phone(phone: str) -> dict:
         conn = get_connection()
         with conn.cursor() as cursor:
             cursor.execute(
-                "SELECT * FROM Customer WHERE PhoneNormalized = %s", (normalized,)
+                """SELECT * FROM Customer
+                   WHERE REPLACE(REPLACE(REPLACE(REPLACE(Phone, ' ', ''), '(', ''), ')', ''), '-', '') = %s""",
+                (normalized,)
             )
             row = cursor.fetchone()
         conn.close()
