@@ -16,4 +16,4 @@ COPY app.py .
 # external port 80 traffic to it. PORT env var tells Gradio which port to bind.
 EXPOSE 5000
 
-CMD ["python", "app.py"]
+CMD ["python", "-u", "app.py"]

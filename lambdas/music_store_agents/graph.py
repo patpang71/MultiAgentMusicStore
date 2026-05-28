@@ -1,4 +1,4 @@
-from langgraph.graph import StateGraph, END
+from langgraph.graph import StateGraph, END, START
 
 from state import AgentState
 from nodes.verify_info_node import verify_info_node
@@ -33,10 +33,10 @@ def create_graph(checkpointer=None):
     builder.add_node("music_agent", music_agent_node)
     builder.add_node("invoice_agent", invoice_agent_node)
 
-    builder.set_conditional_entry_point(
-        _entry_router,
-        {"verify_info": "verify_info", "supervisor": "supervisor"},
-    )
+    builder.add_conditional_edges(START, _entry_router, {
+        "verify_info": "verify_info",
+        "supervisor": "supervisor",
+    })
     builder.add_conditional_edges("verify_info", _after_verify_router, {
         "supervisor": "supervisor",
         END: END,
