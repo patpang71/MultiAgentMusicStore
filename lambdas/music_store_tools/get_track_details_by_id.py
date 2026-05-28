@@ -1,7 +1,11 @@
 from db_connection import get_connection
+import logging
 
+logging.basicConfig(level=logging.INFO)
 
 def get_track_details_by_id(track_id: int) -> dict:
+    logger = logging.getLogger(__name__)
+    logger.info(f"Received input for get_track_details_by_id: {track_id}")
     try:
         conn = get_connection()
         with conn.cursor() as cursor:
@@ -24,6 +28,7 @@ def get_track_details_by_id(track_id: int) -> dict:
         if not row:
             return {"message": f"Cannot find any song from track Id {track_id}"}
 
+        logger.info(f"Found details for track Id {track_id}: {row['trackName']} by {row['artist']}")
         return {
             "trackName": row["trackName"],
             "albumTitle": row["albumTitle"],
@@ -37,4 +42,5 @@ def get_track_details_by_id(track_id: int) -> dict:
         }
 
     except Exception as e:
+        logger.error(f"Error in get_track_details_by_id: {str(e)}")
         return {"message": f"Error {str(e)}"}

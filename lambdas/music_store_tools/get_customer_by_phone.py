@@ -1,6 +1,8 @@
 import re
 from db_connection import get_connection
+import logging
 
+logging.basicConfig(level=logging.INFO)
 
 def _normalize_phone(phone: str) -> str:
     # Strip spaces, parentheses, and dashes so "+49 0711 2842222" → "+4907112842222"
@@ -21,6 +23,8 @@ def _format_customer(row: dict) -> dict:
 
 
 def get_customer_by_phone(phone: str) -> dict:
+    logger = logging.getLogger(__name__)
+    logger.info(f"Received input for get_customer_by_phone: {phone}")
     try:
         normalized = _normalize_phone(str(phone))
         conn = get_connection()
@@ -35,8 +39,9 @@ def get_customer_by_phone(phone: str) -> dict:
 
         if not row:
             return {"message": f"Cannot find customer with phone {phone}"}
-
+        logger.info(f"Found customer with phone {phone}")
         return _format_customer(row)
 
     except Exception as e:
+        logger.error(f"Error in get_customer_by_phone: {str(e)}")
         return {"message": f"Error {str(e)}"}

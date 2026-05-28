@@ -1,4 +1,7 @@
 from db_connection import get_connection
+import logging
+
+logging.basicConfig(level=logging.INFO)
 
 
 def _format_customer(row: dict) -> dict:
@@ -16,6 +19,8 @@ def _format_customer(row: dict) -> dict:
 
 def get_customer_by_email(email: str) -> dict:
     try:
+        logger = logging.getLogger(__name__)
+        logger.info(f"Received input for get_customer_by_email: {email}")
         conn = get_connection()
         with conn.cursor() as cursor:
             cursor.execute(
@@ -27,7 +32,9 @@ def get_customer_by_email(email: str) -> dict:
         if not row:
             return {"message": f"Cannot find customer with email {email}"}
 
+        logger.info(f"Found customer with email {email}")
         return _format_customer(row)
 
     except Exception as e:
+        logger.error(f"Error in get_customer_by_email: {str(e)}")
         return {"message": f"Error {str(e)}"}

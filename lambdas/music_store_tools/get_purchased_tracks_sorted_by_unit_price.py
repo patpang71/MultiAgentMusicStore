@@ -1,7 +1,11 @@
 from db_connection import get_connection
+import logging
 
+logging.basicConfig(level=logging.INFO)
 
 def get_purchased_tracks_sorted_by_unit_price(_input=None) -> list | dict:
+    logger = logging.getLogger(__name__)
+    logger.info("Received input for get_purchased_tracks_sorted_by_unit_price")
     try:
         conn = get_connection()
         with conn.cursor() as cursor:
@@ -25,6 +29,7 @@ def get_purchased_tracks_sorted_by_unit_price(_input=None) -> list | dict:
         if not rows:
             return {"message": "Cannot find any purchased tracks"}
 
+        logger.info(f"Found {len(rows)} purchased tracks sorted by unit price")
         return [
             {
                 "trackId":   str(row["trackId"]),
@@ -37,4 +42,5 @@ def get_purchased_tracks_sorted_by_unit_price(_input=None) -> list | dict:
         ]
 
     except Exception as e:
+        logger.error(f"Error in get_purchased_tracks_sorted_by_unit_price: {str(e)}")
         return {"message": f"Error {str(e)}"}

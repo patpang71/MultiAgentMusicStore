@@ -1,8 +1,13 @@
 from db_connection import get_connection
+import logging
+
+logging.basicConfig(level=logging.INFO)
 
 
 def get_albums_by_artist(artist_input: str) -> dict:
     try:
+        logger = logging.getLogger(__name__)
+        logger.info(f"Received input for get_albums_by_artist: {artist_input}")
         conn = get_connection()
         with conn.cursor() as cursor:
             sql = """
@@ -30,7 +35,9 @@ def get_albums_by_artist(artist_input: str) -> dict:
             {"artist": artist, "albums": albums}
             for artist, albums in grouped.items()
         ]
+        logger.info(f"Found {len(results)} artists matching input '{artist_input}'")
         return {"artistNameInput": artist_input, "results": results}
 
     except Exception as e:
+        logger.error(f"Error in get_albums_by_artist: {str(e)}")
         return {"message": f"Error {str(e)}"}

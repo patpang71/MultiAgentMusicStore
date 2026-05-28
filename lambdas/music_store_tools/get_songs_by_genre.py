@@ -2,9 +2,13 @@ from collections import defaultdict
 from itertools import zip_longest
 
 from db_connection import get_connection
+import logging
 
+logging.basicConfig(level=logging.INFO)
 
 def get_songs_by_genre(genre_input: str) -> dict:
+    logger = logging.getLogger(__name__)
+    logger.info(f"Received input for get_songs_by_genre: {genre_input}")
     try:
         conn = get_connection()
         with conn.cursor() as cursor:
@@ -47,7 +51,9 @@ def get_songs_by_genre(genre_input: str) -> dict:
         for round_tracks in zip_longest(*by_artist.values()):
             interleaved.extend(t for t in round_tracks if t is not None)
 
+        logger.info(f"Found {len(rows)} tracks for genre '{genre_input}' across {len(by_artist)} artists")
         return {"genre": genre_input, "tracks": interleaved}
 
     except Exception as e:
+        logger.error(f"Error in get_songs_by_genre: {str(e)}")
         return {"message": f"Error {str(e)}"}

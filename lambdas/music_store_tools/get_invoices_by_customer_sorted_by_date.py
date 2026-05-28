@@ -1,7 +1,11 @@
 from db_connection import get_connection
+import logging
 
+logging.basicConfig(level=logging.INFO)
 
 def get_invoices_by_customer_sorted_by_date(customer_id) -> list | dict:
+    logger = logging.getLogger(__name__)
+    logger.info(f"Received input for get_invoices_by_customer_sorted_by_date: {customer_id}")
     try:
         customer_id = int(customer_id)
     except (TypeError, ValueError):
@@ -28,7 +32,7 @@ def get_invoices_by_customer_sorted_by_date(customer_id) -> list | dict:
 
         if not rows:
             return {"message": f"Cannot find any invoices for customer {customer_id}"}
-
+        logger.info(f"Found invoices for customer {customer_id}")
         return [
             {
                 "invoiceId":      str(row["invoiceId"]),
@@ -42,4 +46,5 @@ def get_invoices_by_customer_sorted_by_date(customer_id) -> list | dict:
         ]
 
     except Exception as e:
+        logger.error(f"Error in get_invoices_by_customer_sorted_by_date: {str(e)}")
         return {"message": f"Error {str(e)}"}

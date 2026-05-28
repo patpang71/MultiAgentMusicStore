@@ -1,7 +1,11 @@
 from db_connection import get_connection
+import logging
 
+logging.basicConfig(level=logging.INFO)
 
 def get_detail_line_item_for_invoice(invoice_id) -> dict:
+    logger = logging.getLogger(__name__)
+    logger.info(f"Received input for get_detail_line_item_for_invoice: {invoice_id}")
     try:
         invoice_id = int(invoice_id)
     except (TypeError, ValueError):
@@ -39,6 +43,7 @@ def get_detail_line_item_for_invoice(invoice_id) -> dict:
             return {"message": f"Cannot find invoice {invoice_id}"}
 
         first = rows[0]
+        logger.info(f"Found invoice {invoice_id} with {len(rows)} line items")
         return {
             "invoiceId":         str(first["invoiceId"]),
             "customerId":        str(first["customerId"]),
@@ -61,4 +66,5 @@ def get_detail_line_item_for_invoice(invoice_id) -> dict:
         }
 
     except Exception as e:
+        logger.error(f"Error in get_detail_line_item_for_invoice: {str(e)}")
         return {"message": f"Error {str(e)}"}
