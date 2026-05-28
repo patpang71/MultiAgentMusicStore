@@ -12,8 +12,8 @@ phases:
     commands:
       - cd cdk && npm ci --quiet && cd ..
       - mkdir -p layers/music_store_tools_deps/python layers/music_store_agents_deps/python
-      - pip install -r lambdas/music_store_tools/requirements.txt -t layers/music_store_tools_deps/python/ --quiet
-      - pip install -r lambdas/music_store_agents/requirements.txt -t layers/music_store_agents_deps/python/ --quiet
+      - pip install --retries 5 -r lambdas/music_store_tools/requirements.txt -t layers/music_store_tools_deps/python/ --quiet
+      - pip install --retries 5 -r lambdas/music_store_agents/requirements.txt -t layers/music_store_agents_deps/python/ --quiet
 
   build:
     commands:
