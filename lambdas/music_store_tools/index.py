@@ -1,3 +1,8 @@
+import logging
+# Lambda pre-configures the root logger at WARNING; override so INFO messages
+# from all tool modules appear in CloudWatch.
+logging.getLogger().setLevel(logging.INFO)
+
 from get_albums_by_artist import get_albums_by_artist
 from search_tracks_by_artist import search_tracks_by_artist
 from get_songs_by_genre import get_songs_by_genre

@@ -1,3 +1,6 @@
+import logging
+logging.getLogger().setLevel(logging.INFO)
+
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage
 
 from graph import create_graph
