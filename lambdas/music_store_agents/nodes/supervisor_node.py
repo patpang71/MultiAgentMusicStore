@@ -68,10 +68,11 @@ Your role:
 
 def supervisor_node(state: AgentState) -> dict:
     logger.info("supervisor_node called, next_agent=%s", state.get("next_agent"))
-    # Returning from a sub-agent — just ask "What else?" and end the turn
+    # Returning from a sub-agent — sub-agent already provided its answer and closing
+    # question, so just reset routing and let the graph end this turn.
     if state.get("next_agent") == "answered":
         return {
-            "messages": [AIMessage(content="Is there anything else I can help you with?")],
+            "messages": [],
             "next_agent": "",
         }
 

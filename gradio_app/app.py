@@ -27,12 +27,13 @@ _checkpointer = MemorySaver()
 _graph = create_graph(checkpointer=_checkpointer)
 
 
-def _last_ai_message(messages: list) -> str | None:
-    """Return the content of the last AI message in the list, or None."""
-    for msg in reversed(messages):
-        if hasattr(msg, "type") and msg.type == "ai" and msg.content:
-            return msg.content
-    return None
+def _new_ai_messages(messages: list, n_previous: int) -> list[str]:
+    """Return AI message contents added after the first n_previous messages."""
+    new = messages[n_previous:]
+    return [
+        m.content for m in new
+        if hasattr(m, "type") and m.type == "ai" and m.content
+    ]
 
 
 def send_message(user_message: str, history: list, thread_id: str):
@@ -49,6 +50,7 @@ def send_message(user_message: str, history: list, thread_id: str):
 
     try:
         snapshot = _graph.get_state(config)
+        n_previous = len(snapshot.values.get("messages", []))
         state_input: dict = {
             "messages": [HumanMessage(content=user_message)],
             # Always reset routing so a previous agent decision doesn't bleed into the new turn.
@@ -61,7 +63,8 @@ def send_message(user_message: str, history: list, thread_id: str):
         result = _graph.invoke(state_input, config=config)
         elapsed = time.monotonic() - start
 
-        ai_reply = _last_ai_message(result.get("messages", []))
+        new_ai = _new_ai_messages(result.get("messages", []), n_previous)
+        ai_reply = "\n\n".join(new_ai) if new_ai else None
 
         # Check whether the graph paused mid-run (human-in-the-loop interrupt point).
         post_snapshot = _graph.get_state(config)
