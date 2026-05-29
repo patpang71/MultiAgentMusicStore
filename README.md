@@ -1,6 +1,60 @@
 # MultiAgent Music Store
 
-A serverless music store application backed by the [Chinook](https://github.com/lerocha/chinook-database) sample database, deployed to AWS Lambda via an automated CodePipeline.
+A multi-agent AI music store assistant backed by the [Chinook](https://github.com/lerocha/chinook-database) sample database, deployed to AWS via an automated CodePipeline. Users interact through a **Gradio chat UI** hosted on Elastic Beanstalk; the agents are powered by **LangGraph** and **GPT-4o**.
+
+---
+
+## Architecture Overview
+
+```
+User (Browser)
+     │
+     ▼
+┌─────────────────────────────┐
+│  Gradio Chat UI             │  Elastic Beanstalk (Docker, t3.small)
+│  app.py + LangGraph agents  │  Runs agent graph directly in-process
+└────────────┬────────────────┘
+             │  boto3 invoke
+             ▼
+┌─────────────────────────────┐
+│  music-store-tools Lambda   │  Python 3.12, private VPC subnet
+│  SQL query tools            │
+└────────────┬────────────────┘
+             │  pymysql
+             ▼
+┌─────────────────────────────┐
+│  Amazon RDS MySQL 8.0       │  Chinook database, private subnet
+└─────────────────────────────┘
+```
+
+### Agent graph (LangGraph)
+
+```
+START
+  │
+  ├─ verified=False ──► verify_info ──► supervisor
+  │                                         │
+  └─ verified=True ───► supervisor ──────────┤
+                             │               │
+                      route="music"   route="invoice"
+                             │               │
+                        music_agent    invoice_agent
+                             │               │
+                             └───────────────┘
+                                     │
+                               supervisor (reset)
+                                     │
+                                    END
+```
+
+**Nodes:**
+
+| Node | Model | Role |
+|---|---|---|
+| `verify_info` | GPT-4o | Asks for Customer ID, email, or phone; looks up customer via tools; sets `verified=True` |
+| `supervisor` | GPT-4o-mini | Greets customer by first name, classifies each request, routes to sub-agents |
+| `music_agent` | GPT-4o | Answers catalog questions (songs, albums, artists, genres) using music tools |
+| `invoice_agent` | GPT-4o | Answers billing/order questions scoped to the verified customer |
 
 ---
 
@@ -8,128 +62,158 @@ A serverless music store application backed by the [Chinook](https://github.com/
 
 ```
 MultiAgentMusicStore/
-├── dbscripts/
-│   ├── Chinook_MySql.sql                    # Original Chinook schema (explicit PKs)
-│   └── Chinook_MySql_AutoIncrementPKs.sql   # Chinook schema with AUTO_INCREMENT PKs
+├── gradio_app/
+│   ├── app.py                               # Gradio Blocks UI + LangGraph runner
+│   ├── requirements.txt                     # gradio, boto3
+│   └── Dockerfile.beanstalk                 # Docker image for EB deployment
+│
 ├── lambdas/
-│   └── music_store_tools/                   # MCP tool Lambda (Python 3.11)
-│       ├── index.py                         # Lambda entry point — routes by tool name
-│       ├── db_connection.py                 # Shared Secrets Manager + pymysql helper
-│       ├── get_albums_by_artist.py
-│       ├── search_tracks_by_artist.py
-│       ├── get_songs_by_genre.py
-│       ├── search_songs_by_title.py
-│       ├── get_track_details_by_id.py
-│       ├── get_invoices_by_customer_sorted_by_date.py
-│       ├── get_purchased_tracks_sorted_by_unit_price.py
-│       ├── get_detail_line_item_for_invoice.py
-│       ├── requirements.txt                 # Python dependencies (pymysql)
-│       └── tests/                           # Unit tests (mocked DB, no live connection needed)
-│           ├── test_index.py
-│           ├── test_get_albums_by_artist.py
-│           ├── test_search_tracks_by_artist.py
-│           ├── test_get_songs_by_genre.py
-│           ├── test_search_songs_by_title.py
-│           ├── test_get_track_details_by_id.py
-│           ├── test_get_invoices_by_customer_sorted_by_date.py
-│           ├── test_get_purchased_tracks_sorted_by_unit_price.py
-│           └── test_get_detail_line_item_for_invoice.py
-├── cdk/                                      # AWS CDK infrastructure (TypeScript)
-│   ├── bin/
-│   │   └── music-store-app.ts               # CDK app entry point
+│   ├── music_store_tools/                   # Tool Lambda — SQL query functions
+│   │   ├── index.py                         # Entry point: routes event to tool function
+│   │   ├── db_connection.py                 # Secrets Manager + pymysql connection helper
+│   │   ├── get_albums_by_artist.py
+│   │   ├── search_tracks_by_artist.py
+│   │   ├── get_songs_by_genre.py            # Round-robin interleaved by artist
+│   │   ├── search_songs_by_title.py
+│   │   ├── get_track_details_by_id.py
+│   │   ├── get_customer_by_id.py
+│   │   ├── get_customer_by_email.py
+│   │   ├── get_customer_by_phone.py         # Normalizes phone inline (no schema column needed)
+│   │   ├── get_invoices_by_customer_sorted_by_date.py
+│   │   ├── get_purchased_tracks_sorted_by_unit_price.py
+│   │   ├── get_detail_line_item_for_invoice.py
+│   │   ├── requirements.txt                 # pymysql
+│   │   └── tests/                           # Unit tests (mocked DB)
+│   │
+│   └── music_store_agents/                  # Agent Lambda (also runs inside EB container)
+│       ├── index.py                         # Lambda entry point
+│       ├── graph.py                         # LangGraph StateGraph definition
+│       ├── state.py                         # AgentState TypedDict
+│       ├── secrets_helper.py                # Reads OpenAI key from Secrets Manager
+│       ├── preferences_helper.py            # DynamoDB read/write for customer preferences
+│       ├── nodes/
+│       │   ├── verify_info_node.py
+│       │   ├── supervisor_node.py
+│       │   ├── music_agent_node.py
+│       │   └── invoice_agent_node.py
+│       ├── tools/
+│       │   ├── customer_lookup_tools.py     # LangChain tools wrapping the tools Lambda
+│       │   ├── music_catalog_tools.py
+│       │   └── invoice_tools.py
+│       ├── requirements.txt                 # langgraph, langchain, langchain-openai
+│       └── tests/                           # Unit tests
+│
+├── cdk/                                     # AWS CDK infrastructure (TypeScript)
+│   ├── bin/music-store-app.ts               # CDK app entry point
 │   ├── lib/
-│   │   ├── constructs/
-│   │   │   ├── database.ts                  # RDS MySQL construct
-│   │   │   ├── music-store-tools-lambda.ts  # music-store-tools Lambda construct
-│   │   │   └── pipeline.ts                  # CodePipeline construct
-│   │   └── music-store-stack.ts             # Root stack (VPC + DB + Lambda + Pipeline)
-│   ├── buildspecs/
-│   │   ├── test.yml                         # Test stage buildspec
-│   │   ├── db-init.yml                      # One-time DB seed buildspec
-│   │   ├── db-health.yml                    # DB health check buildspec
-│   │   └── deploy.yml                       # Deploy buildspec (CDK)
-│   ├── cdk.json                             # CDK config and context values
-│   ├── package.json
-│   └── tsconfig.json
+│   │   ├── music-store-stack.ts             # Root stack
+│   │   └── constructs/
+│   │       ├── database.ts                  # RDS MySQL + Secrets Manager
+│   │       ├── music-store-tools-lambda.ts  # music-store-tools Lambda + Lambda Layer
+│   │       ├── music-store-agents-lambda.ts # music-store-agents Lambda + DynamoDB table
+│   │       ├── gradio-beanstalk.ts          # Elastic Beanstalk app + S3 bundle bucket
+│   │       └── pipeline.ts                 # CodePipeline (5 stages)
+│   └── buildspecs/
+│       ├── test.yml                         # Run pytest
+│       ├── db-init.yml                      # Seed Chinook DB once (SSM-guarded)
+│       ├── db-health.yml                    # Verify all tables exist and have rows
+│       └── deploy.yml                       # CDK deploy + assemble & push EB bundle
+│
+├── dbscripts/
+│   ├── Chinook_MySql_AutoIncrementPKs.sql   # Chinook schema (AUTO_INCREMENT PKs)
+│   └── add_phone_normalized_column.sql      # Optional migration (not used — see phone note)
+│
 └── README.md
 ```
 
 ---
 
-## Database
+## Agent nodes in detail
 
-The project uses the **Chinook** music store sample database on **Amazon RDS MySQL 8.0**.
+### verify_info
+- Greets the user and asks for one of: Customer ID, email, or phone number
+- Calls the appropriate `music-store-tools` lookup function via the `customer_lookup_tools` wrapper
+- On success: sets `verified=True` and stores `customer_info` (firstName, lastName, email, etc.) in state
+- On failure: apologises and asks the user to try a different identifier
+- Phone numbers are normalised (spaces, parentheses, dashes stripped) and matched inline in SQL
 
-| File | Description |
-|---|---|
-| `Chinook_MySql.sql` | Original schema — PKs are `INT NOT NULL` with values inserted explicitly |
-| `Chinook_MySql_AutoIncrementPKs.sql` | Modified schema — PKs are `INT NOT NULL AUTO_INCREMENT`; INSERT statements omit the PK column and let MySQL assign IDs |
+### supervisor
+- Uses GPT-4o-mini with structured output (`SupervisorDecision`)
+- Greets the verified customer by first name on the first turn
+- Classifies each request and routes to `music_agent` or `invoice_agent`
+- Detects explicit music preferences ("I love jazz") and persists them to DynamoDB
+- After a sub-agent answers, resets routing silently (sub-agents include their own closing prompt)
 
-The pipeline uses `Chinook_MySql_AutoIncrementPKs.sql` and creates a database named `Chinook_AutoIncrement`.
+### music_agent
+- Tool-calling loop: calls music catalog tools until no more tool calls are needed
+- Answers questions about songs, albums, artists, and genres
+- Uses round-robin interleaved results for genre listings (no single artist dominates)
+- Ends each response with a prompt for further catalog questions
 
-### Tables
-
-`Album`, `Artist`, `Customer`, `Employee`, `Genre`, `Invoice`, `InvoiceLine`, `MediaType`, `Playlist`, `PlaylistTrack`, `Track`
+### invoice_agent
+- Scoped to the verified customer's ID — cannot access other customers' data
+- Answers questions about invoices, orders, and purchase history
+- Ends each response with a prompt for further order questions
 
 ---
 
-## Lambda: music-store-tools
+## Database
 
-The `music-store-tools` Lambda exposes eight database query tools for use by an AI agent via MCP.
+**Amazon RDS MySQL 8.0** running the Chinook music store schema.
 
-### Invocation format
+### Tables
+`Album`, `Artist`, `Customer`, `Employee`, `Genre`, `Invoice`, `InvoiceLine`, `MediaType`, `Playlist`, `PlaylistTrack`, `Track`
 
-Send an event with a `tool` name and `input` value:
+### One-time initialization
+The DB Init pipeline stage runs `Chinook_MySql_AutoIncrementPKs.sql` exactly once, guarded by an SSM parameter:
+
+- **`/music-store/db-initialized` not set** → seeds the database, sets the parameter to `"true"`
+- **`/music-store/db-initialized = "true"`** → skips immediately
+
+To force a re-seed:
+```bash
+aws ssm delete-parameter --name "/music-store/db-initialized"
+```
+
+---
+
+## Tool Lambda: music-store-tools
+
+Invoked by the agent nodes via boto3. Accepts events of the form:
 
 ```json
 { "tool": "get_albums_by_artist", "input": "AC/DC" }
 ```
 
-Tools that require no input (e.g. `get_purchased_tracks_sorted_by_unit_price`) can omit the `input` field.
-
-### Music catalogue tools
+### Customer lookup tools
 
 | Tool | Input | Description |
 |---|---|---|
-| `get_albums_by_artist` | Artist name (partial match) | Returns all albums grouped by matching artists |
-| `search_tracks_by_artist` | Artist name (exact match) | Returns up to 20 tracks for the artist |
-| `get_songs_by_genre` | Genre name (exact match) | Returns all tracks for the genre |
-| `search_songs_by_title` | Track title (partial match) | Returns up to 10 matching tracks |
-| `get_track_details_by_id` | Track ID (integer) | Returns full details for a single track |
+| `get_customer_by_id` | Customer ID (integer) | Looks up customer by numeric ID |
+| `get_customer_by_email` | Email address | Looks up customer by email |
+| `get_customer_by_phone` | Phone number (any format) | Normalises and matches against stored phone |
+
+### Music catalog tools
+
+| Tool | Input | Description |
+|---|---|---|
+| `get_albums_by_artist` | Artist name (partial) | Returns all albums grouped by matching artists |
+| `search_tracks_by_artist` | Artist name (exact) | Returns up to 20 tracks for the artist |
+| `get_songs_by_genre` | Genre name (exact) | Returns tracks for the genre, interleaved by artist |
+| `search_songs_by_title` | Track title (partial) | Returns up to 10 matching tracks |
+| `get_track_details_by_id` | Track ID (integer) | Full details for one track |
 
 ### Invoice tools
 
 | Tool | Input | Description |
 |---|---|---|
-| `get_invoices_by_customer_sorted_by_date` | Customer ID (integer) | Returns all invoices for a customer, newest first |
-| `get_purchased_tracks_sorted_by_unit_price` | None | Returns all purchased tracks ordered by unit price descending |
-| `get_detail_line_item_for_invoice` | Invoice ID (integer) | Returns invoice header plus all line items for a specific invoice |
-
-### Response format
-
-Every tool returns JSON. On success it contains the results; on not-found or error:
-
-```json
-{ "message": "Cannot find any invoices for customer 99" }
-{ "message": "Error <error details>" }
-```
-
-### Running unit tests locally
-
-```bash
-cd lambdas/music_store_tools
-python3 -m venv .venv && source .venv/bin/activate
-pip install pymysql boto3 pytest
-pytest tests/ -v
-```
-
-All 24 tests mock the database — no live RDS connection required.
+| `get_invoices_by_customer_sorted_by_date` | Customer ID | All invoices for a customer, newest first |
+| `get_purchased_tracks_sorted_by_unit_price` | None | Store-wide track pricing list |
+| `get_detail_line_item_for_invoice` | Invoice ID | Invoice header + all line items |
 
 ---
 
 ## Infrastructure (AWS CDK)
-
-All AWS resources are defined as TypeScript CDK code under `cdk/`.
 
 ### Resources created
 
@@ -137,11 +221,15 @@ All AWS resources are defined as TypeScript CDK code under `cdk/`.
 |---|---|
 | **VPC** | 2 AZs, public + private subnets, 1 NAT Gateway |
 | **RDS MySQL** | `db.t3.micro`, MySQL 8.0, private subnet, credentials in Secrets Manager |
-| **Lambda** | `music-store-tools` — Python 3.11, 256 MB, 30 s timeout, private subnet |
+| **Lambda: music-store-tools** | Python 3.12, 256 MB, 30 s timeout, private VPC subnet, Lambda Layer for pymysql |
+| **Lambda: music-store-agents** | Python 3.12, Lambda Layer for LangChain/LangGraph dependencies |
+| **DynamoDB** | `music-store-customer-preferences` — per-customer genre/artist preference store |
+| **Elastic Beanstalk** | `music-store-gradio` app + `music-store-gradio-env`, Docker platform, `t3.small`, single instance |
+| **S3 bucket** | Stores EB source bundles uploaded by the pipeline |
 | **CodePipeline** | V2 pipeline — 5 stages (Source → Test → DB Init → DB Health → Deploy) |
-| **CodeBuild projects** | One per stage: `music-store-test`, `music-store-db-init`, `music-store-db-health`, `music-store-deploy` |
-| **SSM Parameter** | `/music-store/db-initialized` — tracks whether the DB seed has run |
-| **Secrets Manager** | `/music-store/db-credentials` — auto-generated RDS admin credentials |
+| **CodeConnections** | GitHub connection for pipeline source |
+| **SSM Parameter** | `/music-store/db-initialized` |
+| **Secrets Manager** | `/music-store/db-credentials` — RDS credentials + OpenAI API key |
 
 ### Pipeline stages
 
@@ -149,67 +237,59 @@ All AWS resources are defined as TypeScript CDK code under `cdk/`.
 GitHub ──► Source ──► Test ──► DB_Init ──► DB_Health_Check ──► Deploy
 ```
 
-| Stage | Tool | What it does |
-|---|---|---|
-| **Source** | CodeStar Connection | Pulls source from GitHub on every push to `main` |
-| **Test** | CodeBuild | Runs `pytest tests/` |
-| **DB_Init** | CodeBuild (in VPC) | Seeds the Chinook database **once**; subsequent runs are a no-op |
-| **DB_Health_Check** | CodeBuild (in VPC) | Verifies all tables exist and contain rows before deploying |
-| **Deploy** | CodeBuild | Runs `cdk deploy` — redeploys the full stack including the Lambda on every run |
+| Stage | What it does |
+|---|---|
+| **Source** | Pulls from GitHub on every push to `main` |
+| **Test** | Runs `pytest` across both Lambda test suites |
+| **DB_Init** | Seeds Chinook DB once (SSM-guarded no-op on subsequent runs) |
+| **DB_Health_Check** | Verifies all tables exist and contain rows before deploying |
+| **Deploy** | Installs Lambda layer deps → `cdk deploy` → assembles & uploads EB bundle → triggers EB deployment |
 
-### Lambda redeployment behaviour
+---
 
-Unlike the database (which is seeded only once), the `music-store-tools` Lambda is **redeployed on every pipeline run**. The Deploy stage:
+## Secrets Manager secret structure
 
-1. Pre-installs Python dependencies (`pymysql`) into the Lambda source directory
-2. Runs `cdk deploy` — CDK detects any code changes, zips the directory, uploads the asset, and updates the Lambda function
+The secret at `/music-store/db-credentials` must contain:
 
-No manual action is needed; pushing a code change to `main` is enough to update the live Lambda.
-
-### One-time database initialization
-
-The DB Init stage is idempotent. Before running the SQL script it checks for an SSM Parameter at `/music-store/db-initialized`:
-
-- **Not found** → runs `Chinook_MySql_AutoIncrementPKs.sql` against RDS, then sets the parameter to `"true"`.
-- **Found (`"true"`)** → skips immediately.
-
-To force a re-seed, delete the flag:
-
-```bash
-aws ssm delete-parameter --name "/music-store/db-initialized"
+```json
+{
+  "host": "...",
+  "username": "...",
+  "password": "...",
+  "openai_api_key": "sk-..."
+}
 ```
+
+The `openai_api_key` field is read at runtime by the agent nodes via `secrets_helper.py`.
+
+---
+
+## Logging
+
+| Component | Log destination |
+|---|---|
+| Gradio app + agent nodes (in EB container) | EB instance logs → EB Console → Logs tab |
+| `music-store-tools` Lambda | CloudWatch → `/aws/lambda/music-store-tools` |
+| `music-store-agents` Lambda | CloudWatch → `/aws/lambda/music-store-agents` |
+
+All components use Python's `logging` module at `INFO` level. The root logger level is set in each Lambda's `index.py` to override the Lambda runtime's default `WARNING` level.
 
 ---
 
 ## Prerequisites
 
 1. [Node.js](https://nodejs.org/) 18+
-2. [AWS CLI](https://aws.amazon.com/cli/) configured with credentials (`aws configure`)
-3. A **GitHub CodeStar Connection** created in the AWS Console:
+2. [AWS CLI](https://aws.amazon.com/cli/) configured (`aws configure`)
+3. A **GitHub CodeConnections** connection created in the AWS Console:
    - Go to **AWS Console → CodePipeline → Settings → Connections**
    - Create a connection to GitHub and authorise it
-   - Copy the connection ARN
+   - Copy the connection ARN (format: `arn:aws:codeconnections:REGION:ACCOUNT:connection/ID`)
 
 ---
 
 ## Deployment
 
-### 1. Configure context values
-
-Edit [cdk/cdk.json](cdk/cdk.json) and fill in your values:
-
-```json
-{
-  "context": {
-    "githubOwner": "YOUR_GITHUB_USERNAME_OR_ORG",
-    "githubRepo": "MultiAgentMusicStore",
-    "githubBranch": "main",
-    "codeStarConnectionArn": "arn:aws:codeconnections:REGION:ACCOUNT_ID:connection/YOUR_CONNECTION_ID"
-  }
-}
-```
-
-### 2. Install dependencies and bootstrap
+### 1. Bootstrap CDK
 
 ```bash
 cd cdk
@@ -217,26 +297,73 @@ npm install
 npx cdk bootstrap
 ```
 
-### 3. Deploy
+### 2. Deploy the stack
 
 ```bash
-npx cdk deploy
+npx cdk deploy MusicStoreStack \
+  -c githubOwner=YOUR_GITHUB_USERNAME \
+  -c githubRepo=MultiAgentMusicStore \
+  -c githubBranch=main \
+  -c codeStarConnectionArn=arn:aws:codeconnections:REGION:ACCOUNT:connection/YOUR_ID
 ```
 
 CDK outputs after deployment:
 
-- `DbEndpoint` — the RDS hostname
-- `DbSecretArn` — Secrets Manager ARN for the admin credentials
-- `MusicStoreToolsLambdaArn` — ARN of the music-store-tools Lambda
-- `PipelineConsoleUrl` — direct link to the pipeline in the AWS Console
+| Output | Description |
+|---|---|
+| `DbEndpoint` | RDS hostname |
+| `DbSecretArn` | Secrets Manager ARN (add `openai_api_key` here) |
+| `MusicStoreToolsLambdaArn` | ARN of the tools Lambda |
+| `MusicStoreAgentsLambdaArn` | ARN of the agents Lambda |
+| `GradioServiceUrl` | URL of the Gradio chat UI |
+| `GradioBundleBucketName` | S3 bucket used by the pipeline for EB bundles |
+| `PipelineConsoleUrl` | Link to the pipeline in the AWS Console |
 
-### 4. Activate the CodeStar connection
+### 3. Add the OpenAI API key to Secrets Manager
 
-After the first `cdk deploy`, go to **AWS Console → Developer Tools → Connections**, find your connection, and click **Update pending connection** to authorise it via GitHub. The pipeline will not trigger until the connection status is `Available`.
+The DB secret is auto-generated by CDK. After deployment, add the OpenAI key:
+
+```bash
+# Retrieve current secret value
+aws secretsmanager get-secret-value --secret-id <DbSecretArn> --query SecretString --output text
+
+# Update with openai_api_key added
+aws secretsmanager put-secret-value \
+  --secret-id <DbSecretArn> \
+  --secret-string '{"host":"...","username":"...","password":"...","openai_api_key":"sk-..."}'
+```
+
+### 4. Activate the CodeConnections connection
+
+After `cdk deploy`, go to **AWS Console → Developer Tools → Connections**, find your connection, and click **Update pending connection** to authorise it via GitHub.
 
 ### 5. Trigger the pipeline
 
-Push a commit to the configured branch. The pipeline starts automatically. On the first run the DB Init stage seeds the Chinook database; all subsequent runs skip that stage. The Deploy stage runs on every push and updates the Lambda if code has changed.
+Push a commit to `main`. The pipeline runs automatically. On the first push:
+- DB Init seeds the Chinook database
+- Deploy builds the Lambda layers, runs `cdk deploy`, and deploys the Gradio app to Elastic Beanstalk
+
+The Gradio UI becomes available at `GradioServiceUrl` after the EB deployment completes (~5 minutes after the Deploy stage finishes).
+
+---
+
+## Running tests locally
+
+```bash
+# music-store-tools tests
+cd lambdas/music_store_tools
+python3 -m venv .venv && source .venv/bin/activate
+pip install pymysql boto3 pytest
+pytest tests/ -v
+
+# music-store-agents tests
+cd lambdas/music_store_agents
+python3 -m venv .venv && source .venv/bin/activate
+pip install langgraph langchain langchain-openai boto3 pytest
+pytest tests/ -v
+```
+
+All tests mock the database and AWS services — no live connections required.
 
 ---
 
@@ -244,11 +371,11 @@ Push a commit to the configured branch. The pipeline starts automatically. On th
 
 ```bash
 # Preview changes without deploying
-npx cdk diff
+npx cdk diff MusicStoreStack -c githubOwner=... -c githubRepo=... -c githubBranch=... -c codeStarConnectionArn=...
 
 # Synthesize CloudFormation template
 npx cdk synth
 
 # Destroy all resources
-npx cdk destroy
+npx cdk destroy MusicStoreStack
 ```
